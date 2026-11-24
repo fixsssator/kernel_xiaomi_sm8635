@@ -51,9 +51,9 @@ commands = {
 missing = [(name, value) for name, value in commands.items()
            if not re.search(r"^\s*#\s*define\s+" + re.escape(name) + r"\b", text, re.M)]
 if missing:
-    guard = re.search(r"^(#\s*define\s+\\w+_H\b[^\n]*\n)", text, re.M)
+    guard = re.search(r"^(#\s*define\s+\w+_H\b[^\n]*\n)", text, re.M)
     if not guard:
-        guard = re.search(r"^(#\s*define\s+\\w+\b[^\n]*\n)", text, re.M)
+        guard = re.search(r"^(#\s*define\s+\w+\b[^\n]*\n)", text, re.M)
     if not guard:
         raise SystemExit("[!] cannot find include guard in susfs_def.h")
     block = "".join(f"#ifndef {name}\n#define {name} {value}\n#endif\n"
