@@ -195,8 +195,9 @@ if [ "$FLAVOR" = bakasu-susfs ]; then
     rm -rf "$tmp_nomount"
     NOMOUNT_VERSION="$(sed -n 's/.*#define NM_MODULE_VERSION "\([^"]*\)".*/\1/p' scripts/nomount/nomount.h)"
     [ -n "$NOMOUNT_VERSION" ] || die "could not read NoMount version from latest source"
-    NOMOUNT_COMMIT="$(git ls-remote "$NOMOUNT_REPO" "refs/tags/$NOMOUNT_TAG^{}" | awk 'NR==1 {print $1}')"
-    log "NoMount Suite release=$NOMOUNT_TAG engine=$NOMOUNT_VERSION commit=${NOMOUNT_COMMIT:-tag-object}"
+    NOMOUNT_COMMIT="$(git ls-remote "$NOMOUNT_REPO" "refs/tags/$NOMOUNT_TAG" "refs/tags/$NOMOUNT_TAG^{}" | awk '$2 ~ /\\^\\{\\}$/ {peeled=$1} NR==1 {first=$1} END {print peeled ? peeled : first}')"
+    [[ "$NOMOUNT_COMMIT" =~ ^[0-9a-f]{40}$ ]] || die "could not resolve NoMount commit for $NOMOUNT_TAG"
+    log "NoMount Suite release=$NOMOUNT_TAG engine=$NOMOUNT_VERSION commit=$NOMOUNT_COMMIT"
   fi
   log "integrating NoMount Suite hookless engine $NOMOUNT_VERSION (mode=$UPSTREAM_MODE)"
   patch -p1 --fuzz=0 < scripts/nomount/nomount_kernel_integration.patch
