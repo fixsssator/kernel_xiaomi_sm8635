@@ -69,6 +69,7 @@ case "$FLAVOR" in
   sukisu-susfs)           ROOT_ENGINE=sukisu;  SUSFS=shim; INTEGRATE=integrate-sukisu.sh; ZIPNAME=SukiSU-Ultra-SUSFS${SUSFS_EXPECT_VERSION#v};        LABEL="SukiSU Ultra + SUSFS ${SUSFS_EXPECT_VERSION}" ;;
   ksun-susfs-droidspaces) ROOT_ENGINE=ksun;    SUSFS=shim; INTEGRATE=integrate.sh; DROIDSPACES=1; ZIPNAME=KSUN${KSUN_TAG#v}-SUSFS${SUSFS_EXPECT_VERSION#v}-DroidSpaces; LABEL="KernelSU-Next + SUSFS + DroidSpaces" ;;
   resukisu-susfs)         ROOT_ENGINE=resukisu; SUSFS=native;                             ZIPNAME=ReSukiSU-SUSFS${SUSFS_EXPECT_VERSION#v};             LABEL="ReSukiSU + SUSFS ${SUSFS_EXPECT_VERSION}" ;;
+  bakasu-susfs)           ROOT_ENGINE=bakasu;   SUSFS=native;                             ZIPNAME=BakaSU-SUSFS${SUSFS_EXPECT_VERSION#v};               LABEL="BakaSU + SUSFS ${SUSFS_EXPECT_VERSION}" ;;
   premium)                ROOT_ENGINE=sukisu;  SUSFS=shim; INTEGRATE=integrate-sukisu.sh; DROIDSPACES=1; ZIPNAME=Premium-SukiSU-SUSFS-DroidSpaces; LABEL="Premium: SukiSU Ultra + SUSFS + DroidSpaces" ;;
   apatch)                 APATCH=1;            ZIPNAME=APatch-KernelPatch${KP_VERSION};   LABEL="APatch / KernelPatch ${KP_VERSION}" ;;
   *) die "unknown flavor '$FLAVOR'" ;;
@@ -87,7 +88,7 @@ if [ "${ALLOW_DIRTY:-0}" != "1" ]; then
   [ -z "$(git status --porcelain --untracked-files=no)" ] || die "tree has uncommitted changes; run in a fresh worktree or set ALLOW_DIRTY=1"
   for d in KernelSU susfs4ksu; do [ -e "$d" ] && die "stale $d/ present; remove it or set ALLOW_DIRTY=1"; done
 fi
-for p in SUSFS_PIN SUKISU_PIN RESUKISU_PIN; do
+for p in SUSFS_PIN SUKISU_PIN RESUKISU_PIN BAKASU_PIN; do
   [[ "${!p}" =~ ^[0-9a-f]{40}$ ]] || die "$p in scripts/ci/pins.env is not a full 40-char sha"
 done
 
@@ -123,6 +124,14 @@ fetch_driver() {
     resukisu)
       git clone --quiet "$RESUKISU_REPO" KernelSU
       git -C KernelSU checkout --quiet "$RESUKISU_PIN" ;;
+    bakasu)
+      # BakaSU already carries the driver-side SUSFS dispatch, SELinux SID glue,
+      # and susfs_init() call. Only the matching kernel-side 50_ patch is applied
+      # by integrate-native.sh; do not run the KSUN/SukiSU driver shims here.
+      git clone --quiet "$BAKASU_REPO" KernelSU
+      git -C KernelSU checkout --quiet "$BAKASU_PIN"
+      local cnt; cnt=$(git -C KernelSU rev-list --count HEAD)
+      [ "$cnt" -gt 100 ] || die "BakaSU clone looks shallow (rev-list count $cnt)" ;;
   esac
   log "driver @ $(git -C KernelSU rev-parse --short HEAD) ($ROOT_ENGINE)"
 }
