@@ -36,6 +36,8 @@
 #   USE_CCACHE=0  do not wrap clang in ccache even if installed
 #   KMI_STRICT=1  fail if scripts/ci/kmi-baseline/<flavor>.symvers is missing (CI sets this)
 #   ALLOW_OTHER_CLANG=1  skip the pinned-toolchain check (deliberate compiler experiments only)
+#   UPSTREAM_MODE=latest  resolve current BakaSU/SUSFS/NoMount upstreams (CI manual default)
+#   UPSTREAM_MODE=pinned  use the audited SHAs and vendored NoMount source
 set -euo pipefail
 
 FLAVOR="${1:-}"
@@ -45,6 +47,8 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 # shellcheck disable=SC1091
 source scripts/ci/pins.env
+
+UPSTREAM_MODE="${UPSTREAM_MODE:-pinned}"
 
 OUT="${OUT:-out}"
 DIST="${DIST:-dist}"
@@ -59,6 +63,11 @@ export PATH="$CLANG_DIR/bin:$PATH"
 log()  { echo "[$(date -u +%H:%M:%S)] $*"; }
 die()  { echo "::error::$*" >&2; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
+
+case "$UPSTREAM_MODE" in
+  latest|pinned) ;;
+  *) die "UPSTREAM_MODE must be latest or pinned (got '$UPSTREAM_MODE')" ;;
+esac
 
 # ---- flavor table (mirror of the CI matrix) --------------------------------
 ROOT_ENGINE=none; SUSFS=none; INTEGRATE=""; DROIDSPACES=0; KPM=0; APATCH=0
@@ -129,9 +138,12 @@ fetch_driver() {
       # and susfs_init() call. Only the matching kernel-side 50_ patch is applied
       # by integrate-native.sh; do not run the KSUN/SukiSU driver shims here.
       git clone --quiet "$BAKASU_REPO" KernelSU
-      git -C KernelSU checkout --quiet "$BAKASU_PIN"
+      if [ "$UPSTREAM_MODE" = pinned ]; then
+        git -C KernelSU checkout --quiet "$BAKASU_PIN"
+      fi
       local cnt; cnt=$(git -C KernelSU rev-list --count HEAD)
-      [ "$cnt" -gt 100 ] || die "BakaSU clone looks shallow (rev-list count $cnt)" ;;
+      [ "$cnt" -gt 100 ] || die "BakaSU clone looks shallow (rev-list count $cnt)" 
+      log "BakaSU commit=$(git -C KernelSU rev-parse HEAD)" ;;
   esac
   log "driver @ $(git -C KernelSU rev-parse --short HEAD) ($ROOT_ENGINE)"
 }
@@ -139,10 +151,17 @@ fetch_driver() {
 fetch_susfs() {
   rm -rf susfs4ksu
   git clone --quiet -b "$SUSFS_BRANCH" "$SUSFS_REPO" susfs4ksu
-  git -C susfs4ksu checkout --quiet "$SUSFS_PIN"
-  local v; v="$(sed -n 's/.*SUSFS_VERSION[^"]*"\([^"]*\)".*/\1/p' susfs4ksu/kernel_patches/include/linux/susfs.h)"
-  [ "$v" = "$SUSFS_EXPECT_VERSION" ] || die "expected SUSFS $SUSFS_EXPECT_VERSION, got '$v' at $SUSFS_PIN"
-  log "susfs4ksu $v @ ${SUSFS_PIN:0:10}"
+  if [ "$UPSTREAM_MODE" = pinned ]; then
+    git -C susfs4ksu checkout --quiet "$SUSFS_PIN"
+  fi
+  local sha v
+  sha="$(git -C susfs4ksu rev-parse HEAD)"
+  v="$(sed -n 's/.*SUSFS_VERSION[^"]*"\([^"]*\)".*/\1/p' susfs4ksu/kernel_patches/include/linux/susfs.h)"
+  [ -n "$v" ] || die "could not determine SUSFS version at $sha"
+  # The native BakaSU integration and artifact naming are currently audited
+  # against v2.4.0. Refuse a newer ABI until its integration is reviewed.
+  [ "$v" = "$SUSFS_EXPECT_VERSION" ] || die "SUSFS $v at $sha differs from audited $SUSFS_EXPECT_VERSION; review integrate-bakasu.sh before using it"
+  log "susfs4ksu $v @ $sha (mode=$UPSTREAM_MODE)"
 }
 
 check_rejects() {
@@ -160,7 +179,27 @@ if [ "$SUSFS" != none ]; then fetch_susfs; fi
 
 # ---- 1.5 NoMount Suite hookless engine (must precede SUSFS) -------------------
 if [ "$FLAVOR" = bakasu-susfs ]; then
-  log "integrating NoMount Suite hookless engine $NOMOUNT_VERSION"
+  if [ "$UPSTREAM_MODE" = latest ]; then
+    # Pull the latest published NoMount Suite source, but keep our kernel-tree
+    # integration patch: it is deliberately adapted to this device tree.
+    local_release="$(curl -fsSL https://api.github.com/repos/Bouteillepleine/NoMount-Suite/releases/latest)"
+    NOMOUNT_TAG="$(printf '%s' "$local_release" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("tag_name", ""))')"
+    [ -n "$NOMOUNT_TAG" ] || die "could not resolve latest NoMount Suite release tag"
+    tmp_nomount="$(mktemp -d)"
+    for file in nomount.c nomount.h; do
+      curl -fsSL "https://raw.githubusercontent.com/Bouteillepleine/NoMount-Suite/$NOMOUNT_TAG/hookless/src/$file" -o "$tmp_nomount/$file"
+      [ -s "$tmp_nomount/$file" ] || die "downloaded empty NoMount file: $file"
+    done
+    cp "$tmp_nomount/nomount.c" scripts/nomount/nomount.c
+    cp "$tmp_nomount/nomount.h" scripts/nomount/nomount.h
+    rm -rf "$tmp_nomount"
+    NOMOUNT_VERSION="$(sed -n 's/.*#define NM_MODULE_VERSION "\([^"]*\)".*/\1/p' scripts/nomount/nomount.h)"
+    [ -n "$NOMOUNT_VERSION" ] || die "could not read NoMount version from latest source"
+    NOMOUNT_COMMIT="$(git ls-remote "$NOMOUNT_REPO" "refs/tags/$NOMOUNT_TAG" "refs/tags/$NOMOUNT_TAG^{}" | awk -v tag="$NOMOUNT_TAG" '$2 == "refs/tags/" tag "^{}" {peeled=$1} NR==1 {first=$1} END {print peeled ? peeled : first}')"
+    [[ "$NOMOUNT_COMMIT" =~ ^[0-9a-f]{40}$ ]] || die "could not resolve NoMount commit for $NOMOUNT_TAG"
+    log "NoMount Suite release=$NOMOUNT_TAG engine=$NOMOUNT_VERSION commit=$NOMOUNT_COMMIT"
+  fi
+  log "integrating NoMount Suite hookless engine $NOMOUNT_VERSION (mode=$UPSTREAM_MODE)"
   patch -p1 --fuzz=0 < scripts/nomount/nomount_kernel_integration.patch
   mkdir -p fs/nomount
   cp scripts/nomount/nomount.c fs/nomount/nomount.c
