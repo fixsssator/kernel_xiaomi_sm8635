@@ -18,11 +18,11 @@ require() {
 }
 
 require "$BAKASU_DIR/kernel/Kconfig" 'config KSU_SUSFS([[:space:]]|$)' 'SUSFS hook choice'
-require "$BAKASU_DIR/kernel/supercall/dispatch.c" 'int ksu_handle_susfs_cmd\\(' 'SUSFS command dispatcher'
-require "$BAKASU_DIR/kernel/selinux/selinux.c" 'bool susfs_is_current_ksu_domain\\(' 'KSU SELinux-domain helper'
+require "$BAKASU_DIR/kernel/supercall/dispatch.c" 'int ksu_handle_susfs_cmd\(' 'SUSFS command dispatcher'
+require "$BAKASU_DIR/kernel/selinux/selinux.c" 'bool susfs_is_current_ksu_domain\(' 'KSU SELinux-domain helper'
 require "$BAKASU_DIR/kernel/selinux/selinux.c" 'u32 susfs_ksu_sid' 'KSU SID export'
 require "$BAKASU_DIR/kernel/selinux/selinux.c" 'u32 susfs_priv_app_sid' 'priv_app SID export'
-require "$BAKASU_DIR/kernel/core/init.c" 'susfs_init\\(\\)' 'SUSFS initialization'
+require "$BAKASU_DIR/kernel/core/init.c" 'susfs_init\(\)' 'SUSFS initialization'
 
 echo "[+] BakaSU driver-side SUSFS API verified"
 
@@ -33,8 +33,8 @@ echo "[+] BakaSU driver-side SUSFS API verified"
 require "$S4K_DIR/kernel_patches/include/linux/susfs_def.h" '#define CMD_SUSFS_SET_SUS_PATH_UID_FILTER[[:space:]]+0x55554([[:space:]]|$)' 'sus path UID-filter command ID'
 require "$S4K_DIR/kernel_patches/include/linux/susfs_def.h" '#define CMD_SUSFS_SET_PRIORITY_UID_FILTER[[:space:]]+0x60030([[:space:]]|$)' 'priority UID-filter command ID'
 for symbol in susfs_set_sus_path_uid_filter susfs_set_priority_uid_filter; do
-  require "$S4K_DIR/kernel_patches/include/linux/susfs.h" "void[[:space:]]+$symbol[[:space:]]*\\(" "$symbol header declaration"
-  require "$S4K_DIR/kernel_patches/fs/susfs.c" "void[[:space:]]+$symbol[[:space:]]*\\(" "$symbol implementation"
+  require "$S4K_DIR/kernel_patches/include/linux/susfs.h" "void[[:space:]]+$symbol[[:space:]]*\(" "$symbol header declaration"
+  require "$S4K_DIR/kernel_patches/fs/susfs.c" "void[[:space:]]+$symbol[[:space:]]*\(" "$symbol implementation"
 done
 
 bash scripts/susfs/integrate-native.sh "$S4K_DIR" "$KROOT"
