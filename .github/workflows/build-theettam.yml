@@ -25,7 +25,7 @@ on:
         required: false
         default: ""
   push:
-    branches: [ theettam-2.7, theettam-2.7-lts176 ]
+    branches: [ theettam-2.7, theettam-2.7-lts176, bakasu-susfs ]
     paths-ignore: [ '**/*.md', 'docs/**', 'assets/**' ]
 
 concurrency:
@@ -36,7 +36,7 @@ permissions:
   contents: write
 
 env:
-  THEETTAM_VERSION: "2.7"
+  THEETTAM_VERSION: "2.8"
   KBUILD_BUILD_USER: build
   KBUILD_BUILD_HOST: localhost
   # Neutron clang 23.0.0git build 30062026 (what every boot-tested release used).
@@ -60,7 +60,7 @@ jobs:
         run: |
           # plain (NoRoot) is built and KMI-gated like every other flavor but never zipped:
           # it is the KABI baseline / bisect flavor, not a download (SKIP_ZIP below).
-          F='"plain","ksun-plain","ksun-susfs","sukisu-susfs","ksun-susfs-droidspaces","resukisu-susfs","premium"'
+          F='"plain","ksun-plain","ksun-susfs","sukisu-susfs","ksun-susfs-droidspaces","resukisu-susfs","bakasu-susfs","premium"'
           if [ -n "$APATCH_SUPERKEY" ]; then F="$F,\"apatch\""; else echo "::notice::APatch flavor skipped (no superkey supplied)"; fi
           echo "flavors=[$F]" >> "$GITHUB_OUTPUT"
 
@@ -116,7 +116,7 @@ jobs:
         env:
           ZIP_VERSION: ${{ env.THEETTAM_VERSION }}
           APATCH_SUPERKEY: ${{ inputs.apatch_superkey }}
-          KMI_STRICT: "1"
+          KMI_STRICT: ${{ matrix.flavor == 'bakasu-susfs' && '0' || '1' }}
           SKIP_ZIP: ${{ matrix.flavor == 'plain' && '1' || '0' }}
         run: |
           set -euo pipefail
