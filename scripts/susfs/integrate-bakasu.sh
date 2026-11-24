@@ -90,6 +90,20 @@ from pathlib import Path
 
 path = Path(sys.argv[1])
 source = path.read_text()
+
+# task_mmu.c does not include the private NoMount engine header. Declare the
+# narrow cross-directory interface here, guarded by CONFIG_NOMOUNT.
+decl = """#ifdef CONFIG_NOMOUNT
+void vfs_map_meta_override(const struct inode *inode, dev_t *dev,
+                           unsigned long *ino);
+#endif
+"""
+include_anchor = '#include "internal.h"'
+if decl.strip() not in source:
+    if source.count(include_anchor) != 1:
+        raise SystemExit("NoMount: unique task_mmu.c internal.h include not found")
+    source = source.replace(include_anchor, include_anchor + "\n\n" + decl, 1)
+
 signature = "show_map_vma(struct seq_file *m, struct vm_area_struct *vma)"
 hook = """#ifdef CONFIG_NOMOUNT
 		vfs_map_meta_override(inode, &dev, &ino);
