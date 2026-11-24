@@ -16,6 +16,13 @@ name: Theettam — build all flavors
 on:
   workflow_dispatch:
     inputs:
+      upstream_mode:
+        description: "Upstream components: latest upstream revisions or known-good pinned revisions"
+        type: choice
+        options:
+          - latest
+          - pinned
+        default: latest
       release:
         description: "Publish a prerelease with the zips (compile-verified, untested)"
         type: boolean
@@ -121,6 +128,7 @@ jobs:
       - name: Build ${{ matrix.flavor }} (scripts/ci/build-flavor.sh)
         env:
           ZIP_VERSION: ${{ env.THEETTAM_VERSION }}
+          UPSTREAM_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.upstream_mode || 'pinned' }}
           APATCH_SUPERKEY: ${{ inputs.apatch_superkey }}
           KMI_STRICT: ${{ matrix.flavor == 'bakasu-susfs' && '0' || '1' }}
           SKIP_ZIP: ${{ matrix.flavor == 'plain' && '1' || '0' }}
