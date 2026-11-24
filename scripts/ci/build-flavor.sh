@@ -36,6 +36,8 @@
 #   USE_CCACHE=0  do not wrap clang in ccache even if installed
 #   KMI_STRICT=1  fail if scripts/ci/kmi-baseline/<flavor>.symvers is missing (CI sets this)
 #   ALLOW_OTHER_CLANG=1  skip the pinned-toolchain check (deliberate compiler experiments only)
+#   UPSTREAM_MODE=latest  resolve current BakaSU/SUSFS/NoMount upstreams (CI manual default)
+#   UPSTREAM_MODE=pinned  use the audited SHAs and vendored NoMount source
 set -euo pipefail
 
 FLAVOR="${1:-}"
@@ -47,7 +49,6 @@ cd "$ROOT"
 source scripts/ci/pins.env
 
 UPSTREAM_MODE="${UPSTREAM_MODE:-pinned}"
-case "$UPSTREAM_MODE" in latest|pinned) ;; *) die "UPSTREAM_MODE must be latest or pinned (got '$UPSTREAM_MODE')" ;; esac
 
 OUT="${OUT:-out}"
 DIST="${DIST:-dist}"
@@ -62,6 +63,11 @@ export PATH="$CLANG_DIR/bin:$PATH"
 log()  { echo "[$(date -u +%H:%M:%S)] $*"; }
 die()  { echo "::error::$*" >&2; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
+
+case "$UPSTREAM_MODE" in
+  latest|pinned) ;;
+  *) die "UPSTREAM_MODE must be latest or pinned (got '$UPSTREAM_MODE')" ;;
+esac
 
 # ---- flavor table (mirror of the CI matrix) --------------------------------
 ROOT_ENGINE=none; SUSFS=none; INTEGRATE=""; DROIDSPACES=0; KPM=0; APATCH=0
