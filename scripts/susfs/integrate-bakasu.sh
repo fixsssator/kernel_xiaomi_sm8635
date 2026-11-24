@@ -38,4 +38,28 @@ for symbol in susfs_set_sus_path_uid_filter susfs_set_priority_uid_filter; do
 done
 
 bash scripts/susfs/integrate-native.sh "$S4K_DIR" "$KROOT"
+
+# Defer the NoMount maps hook until after SUSFS adds its kstat override.
+python3 - "$KROOT/fs/proc/task_mmu.c" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+source = path.read_text()
+marker = "#endif // #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT"
+hook = """#ifdef CONFIG_NOMOUNT
+		{ extern void vfs_map_meta_override(const struct inode *,
+							  dev_t *, unsigned long *);
+		  vfs_map_meta_override(inode, &dev, &ino); }
+#endif"""
+if "vfs_map_meta_override(inode, &dev, &ino)" not in source:
+    if source.count(marker) != 1:
+        raise SystemExit("NoMount insertion point missing or ambiguous after SUSFS kstat hook")
+    source = source.replace(marker, marker + "\n" + hook, 1)
+path.write_text(source)
+print("[+] NoMount maps metadata hook placed after SUSFS kstat override")
+PY
+grep -q 'vfs_map_meta_override(inode, &dev, &ino)' "$KROOT/fs/proc/task_mmu.c" || {
+  echo "[!] NoMount maps metadata hook missing after SUSFS integration"; exit 1;
+}
 python3 scripts/susfs/fix-priority-uid-helpers.py "$KROOT/fs/susfs.c"
