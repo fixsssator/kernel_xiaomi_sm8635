@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
-# Native-susfs driver integration (ReSukiSU): the driver already implements all the
-# susfs driver-side symbols (ksu_handle_sys_reboot, susfs_is_current_ksu_domain,
-# susfs_ksu_sid, the inline ksu_handle_* hooks, selinux_hide, etc.). So we only add
-# the fs-side (susfs4ksu 50_ patch) — NO driver edits, NO hunk stripping, NO shims
-# (those would DUPLICATE the driver's native symbols and fail to link).
+# Native SUSFS fs-side integration for drivers that already implement the
+# driver-side API (currently ReSukiSU and BakaSU). The matching driver wrapper
+# validates each engine's API before this script runs. Only apply the SUSFS
+# kernel-side 50_ patch here: no driver edits, no compatibility shims.
 set -euo pipefail
 
 S4K_DIR="${1:?susfs4ksu dir}"
 KROOT="${2:?kernel root}"
 P50="$S4K_DIR/kernel_patches/50_add_susfs_in_gki-android14-6.1.patch"
 
-echo "[*] === NATIVE susfs integration (fs-side only) ==="
+echo "[*] === native SUSFS integration (fs-side only) ==="
 
 # fs-side sources + headers
 cp -v "$S4K_DIR"/kernel_patches/fs/*.c "$KROOT/fs/"
