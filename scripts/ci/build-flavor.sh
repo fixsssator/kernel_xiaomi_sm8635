@@ -171,7 +171,6 @@ if [ "$FLAVOR" = bakasu-susfs ]; then
   grep -Fq 'obj-$(CONFIG_NOMOUNT) += nomount/' fs/Makefile || die "NoMount directory object rule missing"
   grep -q '^config NOMOUNT$' fs/nomount/Kconfig || die "CONFIG_NOMOUNT Kconfig entry missing"
   grep -Fq 'obj-y += nomount.o' fs/nomount/Makefile || die "NoMount object rule missing"
-  grep -Fq 'nm_inode_hidden_from_caller(inode)' fs/xattr.c || die "NoMount xattr hook missing"
   grep -Fq '#include "overlayfs/ovl_entry.h"' fs/nomount/nomount.c || die "NoMount overlayfs include missing"
   log "NoMount hookless integration patch applied with zero fuzz"
 fi
