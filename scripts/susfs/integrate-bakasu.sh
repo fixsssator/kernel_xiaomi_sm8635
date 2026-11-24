@@ -39,6 +39,49 @@ done
 
 bash scripts/susfs/integrate-native.sh "$S4K_DIR" "$KROOT"
 
+# Add the NoMount xattr guard after SUSFS has finished modifying the filesystem
+# sources. Keep this as a semantic insertion instead of a line-numbered patch:
+# upstream xattr.c context/count changes must not break the whole build.
+python3 - "$KROOT/fs/xattr.c" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+source = path.read_text()
+signature = "vfs_getxattr(struct user_namespace *mnt_userns"
+start = source.find(signature)
+if start < 0 or source.find(signature, start + 1) >= 0:
+    raise SystemExit("NoMount: vfs_getxattr() is missing or ambiguous")
+
+end_marker = "EXPORT_SYMBOL_GPL(vfs_getxattr);"
+end = source.find(end_marker, start)
+if end < 0:
+    raise SystemExit("NoMount: vfs_getxattr() end marker not found")
+body = source[start:end]
+call = "nm_inode_hidden_from_caller(inode)"
+if call in body:
+    print("[=] NoMount xattr guard already present")
+else:
+    anchor = "error = security_inode_getxattr(dentry, name);"
+    if body.count(anchor) != 1:
+        print(body, file=sys.stderr)
+        raise SystemExit("NoMount: unique security_inode_getxattr() call not found in vfs_getxattr()")
+    hook = """#ifdef CONFIG_NOMOUNT
+	{ extern bool nm_inode_hidden_from_caller(const struct inode *);
+	  if (nm_inode_hidden_from_caller(inode))
+		  return -ENOENT; }
+#endif
+
+	"""
+    pos = start + body.index(anchor)
+    source = source[:pos] + hook + source[pos:]
+    path.write_text(source)
+    print("[+] NoMount xattr guard inserted in vfs_getxattr()")
+PY
+grep -q 'nm_inode_hidden_from_caller(inode)' "$KROOT/fs/xattr.c" || {
+  echo "[!] NoMount xattr guard missing after SUSFS integration"; exit 1;
+}
+
 # Place the NoMount maps hook inside show_map_vma(), after the inode metadata
 # overrides (including SUSFS kstat) and before pgoff is consumed.
 python3 - "$KROOT/fs/proc/task_mmu.c" <<'PY'
