@@ -164,7 +164,14 @@ if [ "$FLAVOR" = bakasu-susfs ]; then
   patch -p1 --fuzz=0 < scripts/nomount/nomount_kernel_integration.patch
   cp scripts/nomount/nomount.c fs/nomount.c
   cp scripts/nomount/nomount.h fs/nomount.h
-  grep -q '^config NOMOUNT ---------------------------------------------------------
+  grep -q '^config NOMOUNT$' fs/Kconfig || die "CONFIG_NOMOUNT Kconfig entry missing"
+  grep -q 'obj-$(CONFIG_NOMOUNT) += nomount.o' fs/Makefile || die "NoMount object rule missing"
+  grep -q 'vfs_map_meta_override(inode, &dev, &ino)' fs/proc/task_mmu.c || die "NoMount maps hook missing"
+  grep -q 'nm_inode_hidden_from_caller(inode)' fs/xattr.c || die "NoMount xattr hook missing"
+  log "NoMount hookless integration patch applied with zero fuzz"
+fi
+
+# ---- 2. SUSFS integration ---------------------------------------------------------
 case "$SUSFS" in
   shim)   log "integrating SUSFS via scripts/susfs/$INTEGRATE"
           bash "scripts/susfs/$INTEGRATE" "$PWD/KernelSU" "$PWD/susfs4ksu" "$PWD"; check_rejects ;;
