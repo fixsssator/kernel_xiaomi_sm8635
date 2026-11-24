@@ -60,8 +60,14 @@ jobs:
         run: |
           # plain (NoRoot) is built and KMI-gated like every other flavor but never zipped:
           # it is the KABI baseline / bisect flavor, not a download (SKIP_ZIP below).
-          F='"plain","ksun-plain","ksun-susfs","sukisu-susfs","ksun-susfs-droidspaces","resukisu-susfs","bakasu-susfs","premium"'
-          if [ -n "$APATCH_SUPERKEY" ]; then F="$F,\"apatch\""; else echo "::notice::APatch flavor skipped (no superkey supplied)"; fi
+          # The experimental BakaSU branch builds only its own flavor.
+          # Stable Theettam branches continue to build the full matrix.
+          if [ "$GITHUB_REF_NAME" = "bakasu-susfs" ]; then
+            F='"bakasu-susfs"'
+          else
+            F='"plain","ksun-plain","ksun-susfs","sukisu-susfs","ksun-susfs-droidspaces","resukisu-susfs","bakasu-susfs","premium"'
+            if [ -n "$APATCH_SUPERKEY" ]; then F="$F,\"apatch\""; else echo "::notice::APatch flavor skipped (no superkey supplied)"; fi
+          fi
           echo "flavors=[$F]" >> "$GITHUB_OUTPUT"
 
   build:
