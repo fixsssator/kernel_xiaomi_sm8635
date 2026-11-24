@@ -30,18 +30,3 @@ diff --git a/fs/Makefile b/fs/Makefile
  obj-$(CONFIG_SYSFS)		+= sysfs/
  obj-$(CONFIG_CONFIGFS_FS)	+= configfs/
 
-diff --git a/fs/xattr.c b/fs/xattr.c
---- a/fs/xattr.c
-+++ b/fs/xattr.c
-@@ -418,6 +418,12 @@
- 	error = xattr_permission(mnt_userns, inode, name, MAY_READ);
- 	if (error)
- 		return error;
- 
-+#ifdef CONFIG_NOMOUNT
-+	{ extern bool nm_inode_hidden_from_caller(const struct inode *);
-+	  if (nm_inode_hidden_from_caller(inode))
-+		  return -ENOENT; }
-+#endif
-+
- 	error = security_inode_getxattr(dentry, name);
