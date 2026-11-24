@@ -69,7 +69,7 @@ case "$FLAVOR" in
   sukisu-susfs)           ROOT_ENGINE=sukisu;  SUSFS=shim; INTEGRATE=integrate-sukisu.sh; ZIPNAME=SukiSU-Ultra-SUSFS${SUSFS_EXPECT_VERSION#v};        LABEL="SukiSU Ultra + SUSFS ${SUSFS_EXPECT_VERSION}" ;;
   ksun-susfs-droidspaces) ROOT_ENGINE=ksun;    SUSFS=shim; INTEGRATE=integrate.sh; DROIDSPACES=1; ZIPNAME=KSUN${KSUN_TAG#v}-SUSFS${SUSFS_EXPECT_VERSION#v}-DroidSpaces; LABEL="KernelSU-Next + SUSFS + DroidSpaces" ;;
   resukisu-susfs)         ROOT_ENGINE=resukisu; SUSFS=native;                             ZIPNAME=ReSukiSU-SUSFS${SUSFS_EXPECT_VERSION#v};             LABEL="ReSukiSU + SUSFS ${SUSFS_EXPECT_VERSION}" ;;
-  bakasu-susfs)           ROOT_ENGINE=bakasu;   SUSFS=native;                             ZIPNAME=BakaSU-SUSFS${SUSFS_EXPECT_VERSION#v};               LABEL="BakaSU + SUSFS ${SUSFS_EXPECT_VERSION}" ;;
+  bakasu-susfs)           ROOT_ENGINE=bakasu;   SUSFS=native; INTEGRATE=integrate-bakasu.sh; ZIPNAME=BakaSU-SUSFS${SUSFS_EXPECT_VERSION#v}; LABEL="BakaSU + SUSFS ${SUSFS_EXPECT_VERSION}" ;;
   premium)                ROOT_ENGINE=sukisu;  SUSFS=shim; INTEGRATE=integrate-sukisu.sh; DROIDSPACES=1; ZIPNAME=Premium-SukiSU-SUSFS-DroidSpaces; LABEL="Premium: SukiSU Ultra + SUSFS + DroidSpaces" ;;
   apatch)                 APATCH=1;            ZIPNAME=APatch-KernelPatch${KP_VERSION};   LABEL="APatch / KernelPatch ${KP_VERSION}" ;;
   *) die "unknown flavor '$FLAVOR'" ;;
@@ -163,7 +163,12 @@ case "$SUSFS" in
   shim)   log "integrating SUSFS via scripts/susfs/$INTEGRATE"
           bash "scripts/susfs/$INTEGRATE" "$PWD/KernelSU" "$PWD/susfs4ksu" "$PWD"; check_rejects ;;
   native) log "integrating SUSFS fs-side only (native driver)"
-          bash scripts/susfs/integrate-native.sh "$PWD/susfs4ksu" "$PWD"; check_rejects ;;
+          if [ -n "$INTEGRATE" ]; then
+            bash "scripts/susfs/$INTEGRATE" "$PWD/susfs4ksu" "$PWD" "$PWD/KernelSU"
+          else
+            bash scripts/susfs/integrate-native.sh "$PWD/susfs4ksu" "$PWD"
+          fi
+          check_rejects ;;
 esac
 if [ -f KernelSU/kernel/hook/lsm_hook.c ]; then
   bash scripts/fix-lsm-hook-lto.sh KernelSU/kernel/hook/lsm_hook.c
