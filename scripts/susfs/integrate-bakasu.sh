@@ -39,26 +39,63 @@ done
 
 bash scripts/susfs/integrate-native.sh "$S4K_DIR" "$KROOT"
 
-# Defer the NoMount maps hook until after SUSFS adds its kstat override.
+# Place the NoMount maps hook inside show_map_vma(), after the inode metadata
+# overrides (including SUSFS kstat) and before pgoff is consumed.
 python3 - "$KROOT/fs/proc/task_mmu.c" <<'PY'
 import sys
 from pathlib import Path
 
 path = Path(sys.argv[1])
 source = path.read_text()
-marker = "#endif // #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT"
+signature = "show_map_vma(struct seq_file *m, struct vm_area_struct *vma)"
 hook = """#ifdef CONFIG_NOMOUNT
-		{ extern void vfs_map_meta_override(const struct inode *,
-							  dev_t *, unsigned long *);
-		  vfs_map_meta_override(inode, &dev, &ino); }
-#endif"""
-if "vfs_map_meta_override(inode, &dev, &ino)" not in source:
-    if source.count(marker) != 1:
-        raise SystemExit("NoMount insertion point missing or ambiguous after SUSFS kstat hook")
-    source = source.replace(marker, marker + "\n" + hook, 1)
-path.write_text(source)
-print("[+] NoMount maps metadata hook placed after SUSFS kstat override")
+		vfs_map_meta_override(inode, &dev, &ino);
+#endif
+"""
+
+start = source.find(signature)
+if start < 0 or source.find(signature, start + 1) >= 0:
+    raise SystemExit("NoMount: show_map_vma() is missing or ambiguous")
+
+brace = source.find("{", start)
+if brace < 0:
+    raise SystemExit("NoMount: show_map_vma() opening brace not found")
+
+depth = 0
+end = -1
+for i in range(brace, len(source)):
+    if source[i] == "{":
+        depth += 1
+    elif source[i] == "}":
+        depth -= 1
+        if depth == 0:
+            end = i
+            break
+if end < 0:
+    raise SystemExit("NoMount: show_map_vma() closing brace not found")
+
+body = source[brace:end]
+call = "vfs_map_meta_override(inode, &dev, &ino)"
+if call in body:
+    print("[=] NoMount maps metadata hook already present")
+else:
+    anchor = "pgoff = ((loff_t)vma->vm_pgoff) << PAGE_SHIFT;"
+    if body.count(anchor) != 1:
+        excerpt = body[:5000]
+        print(excerpt, file=sys.stderr)
+        raise SystemExit("NoMount: unique pgoff assignment not found inside show_map_vma()")
+    pos = brace + body.index(anchor)
+    # The SUSFS kstat block must precede this insertion point when SUSFS is enabled.
+    kstat = "CONFIG_KSU_SUSFS_SUS_KSTAT"
+    if kstat in body and body.index(kstat) > body.index(anchor):
+        raise SystemExit("NoMount: SUSFS kstat override appears after the maps hook insertion point")
+    source = source[:pos] + hook + source[pos:]
+    path.write_text(source)
+    print("[+] NoMount maps metadata hook placed inside show_map_vma() before pgoff")
 PY
+grep -q 'vfs_map_meta_override(inode, &dev, &ino)' "$KROOT/fs/proc/task_mmu.c" || {
+  echo "[!] NoMount maps metadata hook missing after SUSFS integration"; exit 1;
+}
 grep -q 'vfs_map_meta_override(inode, &dev, &ino)' "$KROOT/fs/proc/task_mmu.c" || {
   echo "[!] NoMount maps metadata hook missing after SUSFS integration"; exit 1;
 }
