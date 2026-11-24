@@ -195,7 +195,7 @@ if [ "$FLAVOR" = bakasu-susfs ]; then
     rm -rf "$tmp_nomount"
     NOMOUNT_VERSION="$(sed -n 's/.*#define NM_MODULE_VERSION "\([^"]*\)".*/\1/p' scripts/nomount/nomount.h)"
     [ -n "$NOMOUNT_VERSION" ] || die "could not read NoMount version from latest source"
-    NOMOUNT_COMMIT="$(git ls-remote "$NOMOUNT_REPO" "refs/tags/$NOMOUNT_TAG" "refs/tags/$NOMOUNT_TAG^{}" | awk '$2 ~ /\\^\\{\\}$/ {peeled=$1} NR==1 {first=$1} END {print peeled ? peeled : first}')"
+    NOMOUNT_COMMIT="$(git ls-remote "$NOMOUNT_REPO" "refs/tags/$NOMOUNT_TAG" "refs/tags/$NOMOUNT_TAG^{}" | awk -v tag="$NOMOUNT_TAG" '$2 == "refs/tags/" tag "^{}" {peeled=$1} NR==1 {first=$1} END {print peeled ? peeled : first}')"
     [[ "$NOMOUNT_COMMIT" =~ ^[0-9a-f]{40}$ ]] || die "could not resolve NoMount commit for $NOMOUNT_TAG"
     log "NoMount Suite release=$NOMOUNT_TAG engine=$NOMOUNT_VERSION commit=$NOMOUNT_COMMIT"
   fi
