@@ -187,6 +187,13 @@ C=./scripts/config
 make -s -j"$JOBS" O="$OUT" gki_defconfig
 CFG="$OUT/.config"
 if [ "$ROOT_ENGINE" != none ]; then $C --file "$CFG" -e KSU; fi
+# BakaSU exposes KSU_SUSFS as a member of the KernelSU Hooking Method choice.
+# It must replace the default tracepoint hook, not be enabled alongside it.
+if [ "$ROOT_ENGINE" = bakasu ]; then
+  $C --file "$CFG" --disable KSU_TRACEPOINT_HOOK
+  $C --file "$CFG" --disable KSU_MANUAL_HOOK
+  $C --file "$CFG" --enable KSU_SUSFS
+fi
 if [ "$KPM" = 1 ]; then
   grep -rqE '^\s*config KPM\s*$' --include=Kconfig . || die "CONFIG_KPM is not a Kconfig symbol in this tree"
   $C --file "$CFG" -e KPM
