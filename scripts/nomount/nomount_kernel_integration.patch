@@ -33,7 +33,8 @@ diff --git a/fs/Makefile b/fs/Makefile
 diff --git a/fs/xattr.c b/fs/xattr.c
 --- a/fs/xattr.c
 +++ b/fs/xattr.c
-@@ -439,6 +439,12 @@
+@@ -418,6 +418,12 @@
+ 	error = xattr_permission(mnt_userns, inode, name, MAY_READ);
  	if (error)
  		return error;
  
@@ -43,5 +44,4 @@ diff --git a/fs/xattr.c b/fs/xattr.c
 +		  return -ENOENT; }
 +#endif
 +
- 	if (!strncmp(name, XATTR_SECURITY_PREFIX,
- 				XATTR_SECURITY_PREFIX_LEN)) {
+ 	error = security_inode_getxattr(dentry, name);
