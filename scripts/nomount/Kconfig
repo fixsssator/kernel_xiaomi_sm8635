@@ -1,0 +1,7 @@
+config NOMOUNT
+	bool "NoMount Path Redirection Subsystem"
+	default n
+	help
+	  NoMount provides path redirection and virtual file injection
+	  without mounting filesystems. This is the hookless Prism engine
+	  from Bouteillepleine/NoMount-Suite.
