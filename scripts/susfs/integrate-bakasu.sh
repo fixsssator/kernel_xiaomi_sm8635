@@ -96,7 +96,4 @@ PY
 grep -q 'vfs_map_meta_override(inode, &dev, &ino)' "$KROOT/fs/proc/task_mmu.c" || {
   echo "[!] NoMount maps metadata hook missing after SUSFS integration"; exit 1;
 }
-grep -q 'vfs_map_meta_override(inode, &dev, &ino)' "$KROOT/fs/proc/task_mmu.c" || {
-  echo "[!] NoMount maps metadata hook missing after SUSFS integration"; exit 1;
-}
 python3 scripts/susfs/fix-priority-uid-helpers.py "$KROOT/fs/susfs.c"
