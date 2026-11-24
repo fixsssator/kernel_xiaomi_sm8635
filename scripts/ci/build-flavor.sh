@@ -167,7 +167,13 @@ if [ "$FLAVOR" = bakasu-susfs ]; then
   cp scripts/nomount/nomount.h fs/nomount/nomount.h
   cp scripts/nomount/Kconfig fs/nomount/Kconfig
   cp scripts/nomount/Makefile fs/nomount/Makefile
-  grep -q '^source "fs/nomount/Kconfig"
+  grep -Fq 'source "fs/nomount/Kconfig"' fs/Kconfig || die "NoMount Kconfig source missing"
+  grep -Fq 'obj-$(CONFIG_NOMOUNT) += nomount/' fs/Makefile || die "NoMount directory object rule missing"
+  grep -q '^config NOMOUNT$' fs/nomount/Kconfig || die "CONFIG_NOMOUNT Kconfig entry missing"
+  grep -Fq 'obj-y += nomount.o' fs/nomount/Makefile || die "NoMount object rule missing"
+  grep -Fq 'nm_inode_hidden_from_caller(inode)' fs/xattr.c || die "NoMount xattr hook missing"
+  grep -Fq '#include "overlayfs/ovl_entry.h"' fs/nomount/nomount.c || die "NoMount overlayfs include missing"
+  log "NoMount hookless integration patch applied with zero fuzz"
 fi
 
 # ---- 2. SUSFS integration ---------------------------------------------------------
